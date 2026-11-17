@@ -1,0 +1,8 @@
+/Users/sharavishinde/Phishing-detection-system/backend/src/test/java/sentinel_backend/SentinelBackendApplicationTests.java
+/Users/sharavishinde/Phishing-detection-system/backend/src/test/java/sentinel_backend/algorithm/bloom/BloomFilterTest.java
+/Users/sharavishinde/Phishing-detection-system/backend/src/test/java/sentinel_backend/algorithm/kmp/KmpMatcherTest.java
+/Users/sharavishinde/Phishing-detection-system/backend/src/test/java/sentinel_backend/algorithm/trie/DomainTrieTest.java
+/Users/sharavishinde/Phishing-detection-system/backend/src/test/java/sentinel_backend/service/KnownThreatStoreTest.java
+/Users/sharavishinde/Phishing-detection-system/backend/src/test/java/sentinel_backend/service/RiskAnalysisServiceTest.java
+/Users/sharavishinde/Phishing-detection-system/backend/src/test/java/sentinel_backend/service/SuspiciousDomainServiceTest.java
+/Users/sharavishinde/Phishing-detection-system/backend/src/test/java/sentinel_backend/service/SuspiciousPatternServiceTest.java

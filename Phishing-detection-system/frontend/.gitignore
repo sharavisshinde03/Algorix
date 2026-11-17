@@ -1,0 +1,16 @@
+# Node
+node_modules/
+frontend/dist/
+
+# Java / Maven
+backend/target/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+.DS_Store

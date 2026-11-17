@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: sentinel_backend.algorithm.bloom.BloomFilterTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.050 s -- in sentinel_backend.algorithm.bloom.BloomFilterTest
