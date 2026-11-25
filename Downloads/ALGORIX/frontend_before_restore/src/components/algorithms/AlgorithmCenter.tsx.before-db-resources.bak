@@ -1,0 +1,770 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  Search, BookOpen, Library, ChartNoAxesCombined, Trophy,
+  ArrowRight, LoaderCircle, ShieldCheck, Sparkles,
+  Clock3, 
+} from "lucide-react";
+import api from "../../services/api";
+import { lessonCatalog } from "../../data/lessons/lessonCatalog";
+import { curriculum } from "../../data/curriculum";
+import "./AlgorithmCenter.css";
+
+type Section = "discover" | "learn" | "resources" | "progress";
+
+const sections = [
+  { id: "discover" as Section, label: "Discover", icon: Search },
+  { id: "learn" as Section, label: "Learn", icon: BookOpen },
+  { id: "resources" as Section, label: "Resources", icon: Library },
+  { id: "progress" as Section, label: "My progress", icon: ChartNoAxesCombined },
+];
+
+function extractRows(data: any): any[] {
+  if (Array.isArray(data)) return data;
+
+  for (const key of [
+    "items", "content", "resources", "suggestions",
+    "results", "entries", "data", "records"
+  ]) {
+    if (Array.isArray(data?.[key])) return data[key];
+  }
+
+  return [];
+}
+
+
+function getAnalyticsRows(data: any): Array<{ date: string; minutes: number }> {
+  const rows = extractRows(data);
+  return rows.map((item: any) => ({
+    date: String(item.date ?? item.activityDate ?? item.day ?? item.label ?? ""),
+    minutes: Number(
+      item.minutes ?? item.totalMinutes ?? item.studyMinutes ?? item.value ?? 0
+    ),
+  })).filter((item) => item.date && Number.isFinite(item.minutes));
+}
+
+function readable(value: any): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  return JSON.stringify(value, null, 2);
+}
+
+interface AlgorithmCenterProps {
+  onOpenLesson: (lessonId: string, title: string) => void;
+}
+
+export default function AlgorithmCenter({ onOpenLesson }: AlgorithmCenterProps) {
+  const [section, setSection] = useState<Section>("discover");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  // Trie
+  const [searchText, setSearchText] = useState("");
+  const [, setSuggestions] = useState<any[]>([]);
+  const [kmpChapterIds, setKmpChapterIds] = useState<string[]>([]);
+  const [kmpSearching, setKmpSearching] = useState(false);
+
+  // KMP
+  const chapterIds = useMemo(() => Object.keys(lessonCatalog), []);
+  const [chapterId, setChapterId] = useState(chapterIds[0] ?? "");
+  const [phrase, setPhrase] = useState("");
+  const [lessonSearchResult, setLessonSearchResult] = useState<any>(null);
+
+  // Bloom Filter and DSU
+  const [resourceTitle, setResourceTitle] = useState("");
+  const [resourceCheck, setResourceCheck] = useState<any>(null);
+
+  // Segment Tree
+  const [startDate, setStartDate] = useState(
+    new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10)
+  );
+  const [endDate, setEndDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [minutes, setMinutes] = useState("30");
+  const [activityDate, setActivityDate] = useState(
+    new Date().toISOString().slice(0, 10)
+  );
+
+  // QuickSelect
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+
+  const selectedLesson = lessonCatalog[chapterId];
+
+  const lessonContent = selectedLesson
+    ? [
+        selectedLesson.concept,
+        selectedLesson.explanation,
+        ...(selectedLesson.points ?? []),
+        selectedLesson.javaExample,
+      ].join("\n")
+    : "";
+
+
+
+
+  const matchingChapters = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    if (query.length < 2) return [];
+
+    const stopWords = new Set([
+      "how", "to", "learn", "explain", "show", "me",
+      "what", "is", "the", "for", "with", "in", "on",
+      "a", "an", "and", "please", "about", "of", "can"
+    ]);
+
+    const terms = query.split(/\s+/)
+      .filter(word => word.length > 1 && !stopWords.has(word));
+
+    if (!terms.length) return [];
+
+    return curriculum
+      .map(chapter => {
+        const lesson = lessonCatalog[chapter.id];
+        const content = [
+          chapter.title,
+          lesson?.concept ?? "",
+          lesson?.explanation ?? "",
+          ...(lesson?.points ?? []),
+          lesson?.javaExample ?? ""
+        ].join(" ").toLowerCase();
+
+        return {
+          chapter,
+          matches: terms.every(term => content.includes(term)),
+          titleMatch: terms.every(term =>
+            chapter.title.toLowerCase().includes(term)
+          )
+        };
+      })
+      .filter(item => item.matches)
+      .sort((a, b) => Number(b.titleMatch) - Number(a.titleMatch))
+      .slice(0, 12)
+      .map(item => item.chapter);
+  }, [searchText]);
+
+
+
+
+  // KMP independently verifies exact phrase matches. Universal results remain visible.
+  useEffect(() => {
+    const query = searchText.trim();
+
+    if (section !== "discover" || query.length < 2 || matchingChapters.length === 0) {
+      setKmpChapterIds([]);
+      setKmpSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setKmpChapterIds([]);
+    setKmpSearching(true);
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const results = await Promise.all(
+          matchingChapters.map(async (chapter) => {
+            const lesson = lessonCatalog[chapter.id];
+            if (!lesson) return null;
+
+            const content = [
+              chapter.title,
+              lesson.concept,
+              lesson.explanation,
+              ...(lesson.points ?? []),
+              lesson.javaExample,
+              lesson.question,
+              ...(lesson.options ?? []),
+              lesson.answerExplanation,
+            ].filter(Boolean).join("\n").toLowerCase();
+
+            try {
+              const response = await api.post("/lessons/search", {
+                content,
+                query: query.toLowerCase(),
+              });
+              return Number(response.data?.totalMatches ?? 0) > 0
+                ? chapter.id
+                : null;
+            } catch (err) {
+              console.error(`KMP verification failed for ${chapter.id}:`, err);
+              return null;
+            }
+          })
+        );
+
+        if (!cancelled) {
+          setKmpChapterIds(results.filter((id): id is string => id !== null));
+        }
+      } finally {
+        if (!cancelled) setKmpSearching(false);
+      }
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [searchText, section, matchingChapters]);
+
+  const request = async <T,>(
+    action: () => Promise<{ data: T }>,
+    success?: (data: T) => void
+  ) => {
+    setLoading(true);
+    setError("");
+    setNotice("");
+
+    try {
+      const response = await action();
+      success?.(response.data);
+      return response.data;
+    } catch (err: any) {
+      const message =
+        err.response?.data?.message ??
+        (typeof err.response?.data === "string"
+          ? err.response.data
+          : err.message);
+
+      setError(String(message || "Something went wrong. Please try again."));
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Trie: suggestions update as the student types.
+  useEffect(() => {
+    if (section !== "discover" || searchText.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await api.get("/search/suggestions", {
+          params: { q: searchText.trim(), limit: 8 },
+        });
+
+        if (!cancelled) {
+          setSuggestions(extractRows(response.data));
+        }
+      } catch {
+        if (!cancelled) setSuggestions([]);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [searchText, section]);
+
+  const searchLesson = async () => {
+    if (!lessonContent || !phrase.trim()) return;
+
+    await request(
+      () => api.post("/lessons/search", {
+        content: lessonContent.toLowerCase(),
+        query: phrase.trim().toLowerCase(),
+      }),
+      setLessonSearchResult
+    );
+  };
+
+  const checkResource = async () => {
+    if (!resourceTitle.trim()) return;
+
+    await request(
+      () => api.get("/resources/check", {
+        params: { title: resourceTitle.trim() },
+      }),
+      setResourceCheck
+    );
+  };
+
+  const loadAnalytics = async () => {
+    await request(
+      () => api.get("/analytics/learning", {
+        params: { startDate, endDate },
+      }),
+      setAnalytics
+    );
+  };
+
+  const recordActivity = async () => {
+    const value = Number(minutes);
+
+    if (!Number.isFinite(value) || value <= 0) {
+      setError("Enter a valid number of learning minutes.");
+      return;
+    }
+
+    const data = await request(
+      () => api.post("/analytics/activity", {
+        activityDate,
+        minutes: value,
+      })
+    );
+
+    if (data !== null) {
+      setNotice("Your learning activity has been saved.");
+      await loadAnalytics();
+    }
+  };
+
+  const loadLeaderboard = async () => {
+    await request(
+      () => api.get("/leaderboard", {
+        params: { limit: 10 },
+      }),
+      (data) => setLeaderboard(extractRows(data))
+    );
+  };
+
+
+  const activityRows = getAnalyticsRows(analytics);
+  const totalStudyMinutes = activityRows.reduce(
+    (sum, item) => sum + item.minutes, 0
+  );
+  const maxStudyMinutes = Math.max(
+    1, ...activityRows.map((item) => item.minutes)
+  );
+
+  const activeSection = sections.find((item) => item.id === section)!;
+
+  return (
+    <section className="ac">
+      <div className="ac-header">
+        <div>
+          <span className="ac-eyebrow">YOUR ALGORIX WORKSPACE</span>
+          <h2>Explore. Learn. Grow.</h2>
+          <p>Your learning tools, resources and progress in one place.</p>
+        </div>
+        <div className="ac-sparkle"><Sparkles size={24} /></div>
+      </div>
+
+      <nav className="ac-nav" aria-label="Learning workspace">
+        {sections.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            className={section === id ? "ac-nav-item active" : "ac-nav-item"}
+            onClick={() => {
+              setSection(id);
+              setError("");
+              setNotice("");
+            }}
+          >
+            <Icon size={17} />
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      <div className="ac-panel">
+        <div className="ac-panel-heading">
+          <div>
+            <span className="ac-eyebrow">LEARNING TOOLS</span>
+            <h3>{activeSection.label}</h3>
+          </div>
+          <span className="ac-panel-icon">
+            <activeSection.icon size={21} />
+          </span>
+        </div>
+
+        {error && <div className="ac-error">{error}</div>}
+        {notice && <div className="ac-notice">{notice}</div>}
+
+        {section === "discover" && (
+          <div className="ac-content">
+            <h4>What would you like to learn today?</h4>
+            <p>Search across all 46 chapters, lesson explanations and Java examples.</p>
+
+            <div className="ac-search">
+              <Search size={19} />
+              <input
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Try arrays, binary search, graphs, Java..."
+                aria-label="Search all ALGORIX lessons"
+              />
+              {kmpSearching && <LoaderCircle className="ac-spin" size={18} />}
+            </div>
+
+            {searchText.trim().length >= 2 && (
+              <>
+                <div className="ac-suggestions">
+                  <span className="ac-small-label">
+                    MATCHING CHAPTERS · {matchingChapters.length}
+                  </span>
+
+                  {matchingChapters.length > 0 ? matchingChapters.map((chapter) => (
+                    <button
+                      className="ac-chapter-result"
+                      key={chapter.id}
+                      onClick={() => onOpenLesson(chapter.id, chapter.title)}
+                    >
+                      <span className="ac-chapter-result-icon">
+                        <BookOpen size={17} />
+                      </span>
+                      <span className="ac-chapter-result-text">
+                        <strong>{chapter.title}</strong>
+                        <small>
+                          {kmpSearching
+                            ? "Checking phrase with KMP..."
+                            : kmpChapterIds.includes(chapter.id)
+                              ? "KMP verified match · Open lesson"
+                              : "Universal search result · Open lesson"}
+                        </small>
+                      </span>
+                      <ArrowRight size={17} />
+                    </button>
+                  )) : (
+                    <p className="ac-muted">
+                      No results found for "{searchText}". Try a topic covered in the ALGORIX curriculum.
+                    </p>
+                  )}
+                </div>
+
+                <div className="ac-google-results">
+                  <span className="ac-small-label">STUDY THIS TOPIC ONLINE</span>
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(searchText + " computer science tutorial")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Google tutorials for "{searchText}" <ArrowRight size={15} />
+                  </a>
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(searchText + " examples and visualization")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Examples and visual explanations <ArrowRight size={15} />
+                  </a>
+                  <a
+                    href={`https://www.google.com/search?q=${encodeURIComponent(searchText + " Java implementation")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Java implementations <ArrowRight size={15} />
+                  </a>
+                </div>
+              </>
+            )}
+
+            <div className="ac-tip">
+              <Sparkles size={17} />
+              <span>Trie powers topic suggestions, KMP checks lesson phrases, and matching chapters open directly.</span>
+            </div>
+          </div>
+        )}
+
+        {section === "learn" && (
+          <div className="ac-content">
+            <h4>Find something inside your lessons</h4>
+            <p>Choose a chapter and search for a phrase in its content.</p>
+
+            <label className="ac-label" htmlFor="ac-chapter">Select a chapter</label>
+            <select
+              id="ac-chapter"
+              value={chapterId}
+              onChange={(event) => {
+                setChapterId(event.target.value);
+                setLessonSearchResult(null);
+              }}
+            >
+              {chapterIds.map((id) => (
+                <option key={id} value={id}>
+                  {lessonCatalog[id].concept}
+                </option>
+              ))}
+            </select>
+
+            <div className="ac-search">
+              <Search size={18} />
+              <input
+                value={phrase}
+                onChange={(event) => setPhrase(event.target.value)}
+                placeholder="What phrase are you looking for?"
+              />
+            </div>
+
+            <button
+              className="ac-primary"
+              disabled={!phrase.trim() || loading || !lessonContent}
+              onClick={searchLesson}
+            >
+              Search this lesson <ArrowRight size={16} />
+            </button>
+
+            {lessonSearchResult !== null && (
+              <div className="ac-kmp-result">
+                <div className="ac-kmp-result-header">
+                  <div>
+                    <span className="ac-small-label">KMP SEARCH ANALYSIS</span>
+                    <h4>Search results</h4>
+                    <p>Results for "{lessonSearchResult.query}"</p>
+                  </div>
+                  <span className="ac-kmp-icon">
+                    <Search size={22} />
+                  </span>
+                </div>
+
+                <div className="ac-kmp-stat">
+                  <div>
+                    <span className="ac-small-label">TOTAL OCCURRENCES</span>
+                    <strong>{lessonSearchResult.totalMatches ?? 0}</strong>
+                  </div>
+                  <span className={`ac-kmp-status ${Number(lessonSearchResult.totalMatches) > 0 ? "found" : "not-found"}`}>
+                    {Number(lessonSearchResult.totalMatches) > 0 ? "Phrase found" : "No matches found"}
+                  </span>
+                </div>
+
+                <div className="ac-kmp-positions">
+                  <span className="ac-small-label">MATCH POSITIONS</span>
+                  {Array.isArray(lessonSearchResult.positions) && lessonSearchResult.positions.length > 0 ? (
+                    <div className="ac-position-list">
+                      {lessonSearchResult.positions.map((position: number, index: number) => (
+                        <span className="ac-position-chip" key={`${position}-${index}`}>
+                          {position}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="ac-muted">No occurrences of this phrase were found.</p>
+                  )}
+                </div>
+
+                <div className="ac-kmp-footer">
+                  <Sparkles size={16} />
+                  <span>Analysed using the Knuth-Morris-Pratt string matching algorithm.</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {section === "resources" && (
+          <div className="ac-content">
+            <div className="ac-resource-block">
+              <div className="ac-feature-title">
+                <span className="ac-feature-icon"><ShieldCheck size={19} /></span>
+                <div>
+                  <h4>Check a learning resource</h4>
+                  <p>Check whether a resource may already exist in the ALGORIX resource index.</p>
+                </div>
+              </div>
+
+              <div className="ac-search">
+                <Library size={18} />
+                <input
+                  value={resourceTitle}
+                  onChange={(event) => {
+                    setResourceTitle(event.target.value);
+                    setResourceCheck(null);
+                  }}
+                  placeholder="Enter a resource name..."
+                />
+              </div>
+
+              <button
+                className="ac-primary"
+                disabled={!resourceTitle.trim() || loading}
+                onClick={checkResource}
+              >
+                Check resource <ArrowRight size={16} />
+              </button>
+
+              {resourceCheck !== null && (
+                <div className="ac-result">
+                  <strong>Resource availability check</strong>
+                  <pre>{readable(resourceCheck)}</pre>
+                  <p className="ac-muted">
+                    This is a Bloom Filter pre-check. A possible match should be verified against the resource database.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="ac-separator" />
+
+            <div className="ac-feature-title">
+              <span className="ac-feature-icon"><BookOpen size={19} /></span>
+              <div>
+                <h4>Curated study resources</h4>
+                <p>Useful references for the topics covered in ALGORIX.</p>
+              </div>
+            </div>
+
+            <div className="ac-resource-links">
+              <a href="https://dev.java/learn/" target="_blank" rel="noreferrer">
+                <span><strong>Java Learning</strong><small>Official Java tutorials and guides</small></span>
+                <ArrowRight size={16} />
+              </a>
+              <a href="https://docs.oracle.com/en/java/" target="_blank" rel="noreferrer">
+                <span><strong>Java Documentation</strong><small>Official language and API documentation</small></span>
+                <ArrowRight size={16} />
+              </a>
+              <a href="https://visualgo.net/en" target="_blank" rel="noreferrer">
+                <span><strong>VisuAlgo</strong><small>Interactive data structure and algorithm visualizations</small></span>
+                <ArrowRight size={16} />
+              </a>
+              <a href="https://cp-algorithms.com/" target="_blank" rel="noreferrer">
+                <span><strong>CP-Algorithms</strong><small>Algorithm explanations and implementations</small></span>
+                <ArrowRight size={16} />
+              </a>
+              <a href="https://leetcode.com/problemset/" target="_blank" rel="noreferrer">
+                <span><strong>LeetCode Problems</strong><small>Practice coding problems by topic</small></span>
+                <ArrowRight size={16} />
+              </a>
+            </div>
+          </div>
+        )}
+
+        {section === "progress" && (
+          <div className="ac-content">
+            <div className="ac-feature-title">
+              <span className="ac-feature-icon"><ChartNoAxesCombined size={19} /></span>
+              <div>
+                <h4>Your learning activity</h4>
+                <p>Review your recorded study time over a date range.</p>
+              </div>
+            </div>
+
+            <div className="ac-date-row">
+              <div>
+                <label className="ac-label">From</label>
+                <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div>
+                <label className="ac-label">To</label>
+                <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              </div>
+            </div>
+
+            <button
+              className="ac-primary"
+              disabled={loading || startDate > endDate}
+              onClick={loadAnalytics}
+            >
+              View my activity <ArrowRight size={16} />
+            </button>
+
+            {analytics !== null && (
+              <div className="ac-analytics">
+                <div className="ac-analytics-summary">
+                  <div>
+                    <span className="ac-small-label">TOTAL STUDY TIME</span>
+                    <strong>{Math.floor(totalStudyMinutes / 60)}h {totalStudyMinutes % 60}m</strong>
+                  </div>
+                  <div>
+                    <span className="ac-small-label">DAYS RECORDED</span>
+                    <strong>{activityRows.length}</strong>
+                  </div>
+                </div>
+
+                {activityRows.length > 0 ? (
+                  <div className="ac-chart">
+                    {activityRows.map((item, index) => (
+                      <div className="ac-chart-row" key={`${item.date}-${index}`}>
+                        <span className="ac-chart-date">{item.date}</span>
+                        <div className="ac-chart-track">
+                          <div
+                            className="ac-chart-bar"
+                            style={{
+                              width: `${Math.max(2, (item.minutes / maxStudyMinutes) * 100)}%`
+                            }}
+                          />
+                        </div>
+                        <strong>{item.minutes} min</strong>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="ac-muted">
+                    No daily activity rows were returned for this date range.
+                    Check the response format from the analytics endpoint.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="ac-separator" />
+
+            <div className="ac-feature-title">
+              <span className="ac-feature-icon"><Clock3 size={19} /></span>
+              <div>
+                <h4>Record a study session</h4>
+                <p>Save your learning time to your activity history.</p>
+              </div>
+            </div>
+
+            <label className="ac-label">Study date</label>
+            <input type="date" value={activityDate} onChange={(e) => setActivityDate(e.target.value)} />
+
+            <label className="ac-label">Time spent (minutes)</label>
+            <input
+              type="number"
+              min="1"
+              max="1440"
+              value={minutes}
+              onChange={(e) => setMinutes(e.target.value)}
+            />
+
+            <button
+              className="ac-primary"
+              disabled={loading || Number(minutes) <= 0 || Number(minutes) > 1440}
+              onClick={recordActivity}
+            >
+              Save study session <ArrowRight size={16} />
+            </button>
+
+            <div className="ac-separator" />
+
+            <div className="ac-feature-title">
+              <span className="ac-feature-icon"><Trophy size={19} /></span>
+              <div>
+                <h4>Student leaderboard</h4>
+                <p>See how students are progressing across ALGORIX.</p>
+              </div>
+            </div>
+
+            <button className="ac-primary" disabled={loading} onClick={loadLeaderboard}>
+              View leaderboard <Trophy size={16} />
+            </button>
+
+            {leaderboard.length > 0 && (
+              <div className="ac-leaderboard">
+                {leaderboard.map((student, index) => (
+                  <div className="ac-student" key={student.id ?? student.userId ?? index}>
+                    <span className="ac-rank">{index + 1}</span>
+                    <div>
+                      <strong>{student.name ?? student.username ?? student.email ?? `Student ${index + 1}`}</strong>
+                      <small>{student.points ?? student.score ?? student.completedLessons ?? "Learner"}</small>
+                    </div>
+                    <Trophy size={17} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {leaderboard.length === 0 && (
+              <p className="ac-muted">
+                Load the leaderboard to see current student rankings.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="ac-footer">
+        <Sparkles size={15} />
+        <span>Powered by the algorithms running inside ALGORIX.</span>
+      </div>
+    </section>
+  );
+}
