@@ -1,0 +1,450 @@
+import "./LessonAnimation.css";
+
+type Kind =
+  | "flow" | "memory" | "array" | "linked"
+  | "stack" | "queue" | "tree" | "graph"
+  | "hash" | "sort" | "recursion" | "dp"
+  | "trie" | "kmp" | "bloom" | "dsu"
+  | "segment" | "select";
+
+interface Visual {
+  title: string;
+  subtitle: string;
+  kind: Kind;
+  labels: string[];
+  steps: string[];
+  detail: string;
+}
+
+const make = (
+  title: string,
+  subtitle: string,
+  kind: Kind,
+  labels: string[],
+  steps: string[],
+  detail: string
+): Visual => ({ title, subtitle, kind, labels, steps, detail });
+
+const visuals: Record<string, Visual> = {
+  "java-intro": make("How a program works", "Programming foundations", "flow",
+    ["Problem", "Algorithm", "Code", "Output"],
+    ["Understand the problem", "Design the solution", "Write the program", "Execute the program"],
+    "A program transforms instructions and input into a meaningful result."),
+  "java-setup": make("Java execution pipeline", "From source code to execution", "flow",
+    ["Main.java", "javac", "Bytecode", "JVM"],
+    ["Write Java source code", "Compiler checks and compiles", "Bytecode is generated", "JVM executes bytecode"],
+    "The JDK provides development tools, javac compiles source code, and the JVM executes bytecode."),
+  "java-syntax": make("Anatomy of Java", "Class, method and statements", "flow",
+    ["Class", "main()", "Statement", "Result"],
+    ["Declare a class", "Define the main method", "Execute statements", "Produce output"],
+    "Java code is organized into classes and methods. Braces define blocks and semicolons terminate most statements."),
+  "java-variables": make("Variables in memory", "Typed storage locations", "memory",
+    ["int age", "double score", "char grade", "boolean passed"],
+    ["Declare a variable", "Assign a value", "Read the stored value", "Use it in an expression"],
+    "Variables associate names and types with values used by a program."),
+  "java-operators": make("Expression evaluation", "Operators and precedence", "flow",
+    ["12 + 5", "12 % 5", "12 > 5", "true && true"],
+    ["Evaluate arithmetic", "Calculate remainder", "Compare operands", "Combine boolean results"],
+    "Operators perform arithmetic, comparisons, logical operations and assignments."),
+  "java-input": make("Input to output", "Reading user input", "flow",
+    ["Keyboard", "Scanner", "Variable", "Output"],
+    ["User enters data", "Scanner reads input", "Value is stored", "Program displays result"],
+    "Input allows a program to respond to values supplied while it is running."),
+  "java-conditionals": make("Decision making", "if, else if and else", "flow",
+    ["Condition", "True branch", "False branch", "Result"],
+    ["Evaluate condition", "Follow true branch", "Otherwise follow false branch", "Continue execution"],
+    "Conditional statements choose which instructions execute based on a boolean expression."),
+  "java-loops": make("Loop execution", "Repeated instructions", "flow",
+    ["Initialize", "Check", "Execute", "Update"],
+    ["Initialize counter", "Check loop condition", "Execute loop body", "Update and repeat"],
+    "A loop repeats a block while its continuation condition remains true."),
+  "java-methods": make("Method execution", "Parameters and return values", "flow",
+    ["Call", "Arguments", "Method body", "Return"],
+    ["Call the method", "Pass arguments", "Execute method body", "Return a value"],
+    "Methods package reusable behavior and can receive parameters and return results."),
+  "java-arrays": make("Array memory", "Indexed contiguous elements", "array",
+    ["12", "24", "36", "48", "60"],
+    ["Create array", "Access index", "Update element", "Traverse elements"],
+    "An array stores a fixed-size sequence of elements accessed using zero-based indices."),
+  "java-strings": make("String operations", "Characters and immutable values", "array",
+    ["C", "O", "D", "E"],
+    ["Create string", "Read characters", "Create modified result", "Compare strings"],
+    "Java strings are immutable objects. Operations return results rather than modifying the original string."),
+  "java-oop": make("Object-oriented programming", "Classes and objects", "flow",
+    ["Class", "Object", "State", "Behavior"],
+    ["Define a class", "Create an object", "Store object state", "Call object methods"],
+    "Object-oriented programming organizes software around objects that combine state and behavior."),
+  "java-constructors": make("Object construction", "Initializing an object", "flow",
+    ["new", "Constructor", "Fields", "Object"],
+    ["Allocate an object", "Invoke constructor", "Initialize fields", "Return object reference"],
+    "Constructors initialize newly created objects."),
+  "java-encapsulation": make("Encapsulation", "Controlled access to data", "flow",
+    ["Private data", "Getter", "Validation", "Setter"],
+    ["Hide internal state", "Request a value", "Validate an update", "Control access"],
+    "Encapsulation protects object state by controlling access through methods."),
+  "java-inheritance": make("Inheritance hierarchy", "Reusing parent behavior", "tree",
+    ["Vehicle", "Car", "Bike", "Truck"],
+    ["Define parent class", "Extend parent class", "Inherit common members", "Add specialized behavior"],
+    "Inheritance allows a subclass to reuse and specialize members of a superclass."),
+  "java-polymorphism": make("Polymorphic behavior", "One interface, different implementations", "flow",
+    ["Animal", "Dog", "Cat", "Sound"],
+    ["Use parent reference", "Resolve actual object", "Invoke overridden method", "Observe specialized behavior"],
+    "Polymorphism allows the same method call to behave differently for different object types."),
+  "java-abstraction": make("Abstraction", "Expose essential behavior", "flow",
+    ["Interface", "Contract", "Implementation", "Result"],
+    ["Define a contract", "Hide implementation details", "Implement required methods", "Use through abstraction"],
+    "Abstraction exposes essential operations while hiding implementation details."),
+  "java-static": make("Static members", "Class-level state and behavior", "memory",
+    ["Class", "static field", "static method", "Shared value"],
+    ["Load the class", "Create class-level member", "Access without an instance", "Share class-level state"],
+    "Static members belong to the class rather than to an individual object."),
+  "java-exceptions": make("Exception handling", "Try, catch and finally", "flow",
+    ["try", "Risky code", "catch", "finally"],
+    ["Enter try block", "Execute operation", "Handle an exception", "Run cleanup"],
+    "Exception handling separates normal execution from error recovery."),
+  "java-generics": make("Generic types", "Reusable type-safe code", "flow",
+    ["T", "List<T>", "Integer", "Type safety"],
+    ["Declare type parameter", "Create generic structure", "Supply concrete type", "Check types at compile time"],
+    "Generics allow classes and methods to work with types while preserving compile-time type safety."),
+  "java-collections": make("Java Collections Framework", "Choosing a collection", "flow",
+    ["List", "Set", "Queue", "Map"],
+    ["Choose a data model", "Select collection interface", "Store elements", "Use collection operations"],
+    "Collections provide reusable data structures with different ordering, uniqueness and access properties."),
+  "java-list": make("List operations", "Ordered elements", "array",
+    ["A", "B", "C", "D", "E"],
+    ["Append element", "Access by index", "Insert at position", "Remove an element"],
+    "A List maintains an ordered sequence and supports indexed access."),
+  "java-stack-queue": make("Stack and queue", "LIFO versus FIFO", "stack",
+    ["10", "20", "30", "40"],
+    ["Push an element", "Inspect the top", "Pop the top", "Observe LIFO order"],
+    "A stack removes the most recently added element. A queue removes the earliest added element."),
+  "java-map-set": make("Map and Set", "Keys, values and uniqueness", "hash",
+    ["key:A", "key:B", "key:C", "unique"],
+    ["Compute a key", "Store key-value pair", "Check membership", "Reject duplicate set values"],
+    "Maps associate keys with values, while sets maintain unique elements."),
+  "java-io": make("Java input and output", "Streams and files", "flow",
+    ["Source", "Input stream", "Program", "Output file"],
+    ["Open a source", "Read data", "Process data", "Write or close output"],
+    "Java I/O APIs move data between programs and external sources or destinations."),
+
+  "ds-arrays": make("Array operations", "Insertion, access and traversal", "array",
+    ["14", "28", "35", "49", "63"],
+    ["Read an index", "Locate insertion position", "Shift elements", "Insert or update value"],
+    "Array elements are stored in indexed positions. Insertion in the middle may require shifting elements."),
+  "ds-linked-lists": make("Linked list traversal", "Nodes and pointers", "linked",
+    ["12", "25", "37", "49"],
+    ["Start at head", "Follow next pointer", "Visit current node", "Stop at null"],
+    "A linked list stores data in nodes connected by references. Traversal follows those references."),
+  "ds-stacks": make("Stack operations", "Push and pop", "stack",
+    ["10", "20", "30", "40"],
+    ["Push 10", "Push 20", "Push 30", "Pop the top element"],
+    "A stack follows last-in, first-out order. Push adds to the top and pop removes from the top."),
+  "ds-queues": make("Queue operations", "Enqueue and dequeue", "queue",
+    ["10", "20", "30", "40"],
+    ["Enqueue 10", "Enqueue 20", "Enqueue 30", "Dequeue the front"],
+    "A queue follows first-in, first-out order. New elements join the rear and removal occurs at the front."),
+  "ds-hashing": make("Hash table lookup", "Hash function and buckets", "hash",
+    ["12 → 2", "25 → 5", "32 → 2", "41 → 1"],
+    ["Receive key", "Compute hash", "Find bucket", "Resolve collision if needed"],
+    "Hashing maps keys to bucket positions. Different keys can collide and require a collision strategy."),
+  "ds-trees": make("Tree structure", "Parent-child relationships", "tree",
+    ["A", "B", "C", "D", "E", "F", "G"],
+    ["Start at root", "Visit left subtree", "Visit right subtree", "Complete traversal"],
+    "Trees organize nodes hierarchically through parent-child relationships."),
+  "ds-bst": make("Binary search tree", "Ordered search", "tree",
+    ["50", "30", "70", "20", "40", "60", "80"],
+    ["Compare with root", "Move left if smaller", "Move right if larger", "Find target or null"],
+    "A binary search tree places smaller values to the left and larger values to the right of a node."),
+  "ds-heaps": make("Heap operations", "Parent-child priority", "tree",
+    ["90", "70", "80", "20", "40", "50", "60"],
+    ["Inspect root", "Insert at next position", "Restore heap order", "Remove root and heapify"],
+    "A heap maintains a priority relationship between parents and children."),
+  "ds-graphs": make("Graph traversal", "Vertices and edges", "graph",
+    ["A", "B", "C", "D"],
+    ["Choose a start vertex", "Visit adjacent vertex", "Track visited nodes", "Continue traversal"],
+    "Graphs model relationships through vertices and edges. BFS and DFS explore those relationships."),
+  "ds-search-sort": make("Searching and sorting", "Ordering and locating values", "sort",
+    ["8", "3", "6", "1", "5", "2"],
+    ["Inspect unsorted values", "Compare candidates", "Move or exchange values", "Locate the target or sorted order"],
+    "Searching locates values; sorting arranges values according to a chosen ordering."),
+
+  "adv-recursion": make("Recursive execution", "Call stack and base case", "recursion",
+    ["factorial(4)", "factorial(3)", "factorial(2)", "factorial(1)"],
+    ["Call factorial(4)", "Reduce to factorial(3)", "Continue to base case", "Unwind return values"],
+    "Recursion solves a problem by calling the same method on smaller inputs until a base case is reached."),
+  "adv-backtracking": make("Backtracking search", "Choose, explore and undo", "recursion",
+    ["Choose", "Explore", "Check", "Backtrack"],
+    ["Choose a candidate", "Explore the next state", "Check constraints", "Undo and try another choice"],
+    "Backtracking explores candidate solutions and reverses choices when a path cannot lead to a valid solution."),
+  "adv-greedy": make("Greedy strategy", "Locally optimal choices", "flow",
+    ["Candidates", "Best local choice", "Update state", "Final solution"],
+    ["Inspect available choices", "Choose the locally best option", "Update remaining problem", "Continue until complete"],
+    "A greedy algorithm makes locally optimal choices and relies on a problem-specific proof for global correctness."),
+  "adv-dp": make("Dynamic programming", "Reuse overlapping subproblems", "dp",
+    ["dp[0]", "dp[1]", "dp[2]", "dp[3]", "dp[4]"],
+    ["Define base cases", "Identify recurrence", "Reuse previous states", "Build final answer"],
+    "Dynamic programming stores results of overlapping subproblems to avoid repeated computation."),
+  "adv-graphs": make("Graph algorithms", "Explore weighted relationships", "graph",
+    ["A", "B", "C", "D"],
+    ["Initialize distances", "Select next vertex", "Relax outgoing edges", "Continue until complete"],
+    "Graph algorithms solve connectivity, traversal and shortest-path problems over vertices and edges."),
+
+  "algo-trie": make("Trie prefix search", "Character-by-character navigation", "trie",
+    ["root", "c", "a", "t"],
+    ["Start at root", "Follow character c", "Follow character a", "Reach terminal word"],
+    "A trie stores strings by shared prefixes, enabling efficient prefix lookup and autocomplete."),
+  "algo-kmp": make("KMP string matching", "Prefix table and pattern shifts", "kmp",
+    ["Pattern", "Prefix table", "Compare", "Shift"],
+    ["Preprocess the pattern", "Build longest-prefix-suffix table", "Compare text characters", "Shift using prefix information"],
+    "KMP avoids rechecking matched characters by using information from the pattern's prefix table."),
+  "algo-bloom": make("Bloom filter", "Probabilistic membership test", "bloom",
+    ["Bit 1", "Bit 2", "Bit 3", "Bit 4", "Bit 5", "Bit 6"],
+    ["Hash the item", "Set multiple bit positions", "Check all bit positions", "Report possible or definitely absent"],
+    "A Bloom filter can say an item is possibly present or definitely absent. False positives are possible; false negatives are not expected in a standard filter."),
+  "algo-dsu": make("Disjoint Set Union", "Find and union", "dsu",
+    ["A", "B", "C", "D", "E"],
+    ["Initialize separate sets", "Find representative", "Union two sets", "Compress paths during find"],
+    "DSU maintains disjoint groups using representative lookup and union operations."),
+  "algo-segment": make("Segment tree", "Range query and update", "segment",
+    ["[0,7]", "[0,3]", "[4,7]", "[0,1]", "[2,3]"],
+    ["Build interval tree", "Decompose query range", "Combine covered nodes", "Update affected ancestors"],
+    "A segment tree supports efficient range queries and point updates by storing information in interval nodes."),
+  "algo-quickselect": make("QuickSelect", "Partition and select kth element", "select",
+    ["9", "2", "7", "4", "1", "8", "5"],
+    ["Choose a pivot", "Partition smaller and larger values", "Check pivot position", "Continue only in target partition"],
+    "QuickSelect uses partitioning to find the kth smallest or largest element without fully sorting the array.")
+};
+
+function ArrayVisual({ labels, active }: { labels: string[]; active: number }) {
+  return (
+    <div className="la-array">
+      {labels.map((label, i) => (
+        <div className={`la-array-cell ${i === active ? "active" : ""}`} key={`${label}-${i}`}>
+          <strong>{label}</strong>
+          <small>[{i}]</small>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FlowVisual({ labels, active }: { labels: string[]; active: number }) {
+  return (
+    <div className="la-flow">
+      {labels.map((label, i) => (
+        <div className="la-flow-item" key={i}>
+          <div className={`la-node ${i === active ? "active" : ""}`}>{label}</div>
+          {i < labels.length - 1 && <span className="la-arrow">→</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function LinkedVisual({ labels, active }: { labels: string[]; active: number }) {
+  return (
+    <div className="la-linked">
+      <div className="la-pointer">HEAD ↓</div>
+      <div className="la-linked-row">
+        {labels.map((label, i) => (
+          <div className="la-linked-group" key={i}>
+            <div className={`la-linked-node ${i === active ? "active" : ""}`}>
+              <strong>{label}</strong><small>data</small>
+            </div>
+            {i < labels.length - 1 && <span className="la-arrow">→</span>}
+          </div>
+        ))}
+        <span className="la-null">NULL</span>
+      </div>
+      <div className="la-pointer">CURRENT ↑</div>
+    </div>
+  );
+}
+
+function StackVisual({ labels, active, queue = false }: {
+  labels: string[]; active: number; queue?: boolean;
+}) {
+  return (
+    <div className={`la-stack-wrap ${queue ? "la-queue" : ""}`}>
+      <span>{queue ? "FRONT" : "TOP"}</span>
+      <div className="la-stack">
+        {labels.map((_, i) => {
+          const index = queue ? i : labels.length - 1 - i;
+          return (
+            <div className={`la-stack-item ${index === active ? "active" : ""}`} key={i}>
+              {labels[index]}
+            </div>
+          );
+        })}
+      </div>
+      <span>{queue ? "REAR" : "BOTTOM"}</span>
+    </div>
+  );
+}
+
+function TreeVisual({ labels, active }: { labels: string[]; active: number }) {
+  const positions = [
+    [210, 25], [115, 95], [305, 95],
+    [65, 160], [165, 160], [255, 160], [355, 160]
+  ];
+  const edges = [[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]];
+  return (
+    <div className="la-tree">
+      <svg viewBox="0 0 420 195" role="img" aria-label="Animated tree structure">
+        {edges.map(([a,b], i) => (
+          <line key={i}
+            x1={positions[a][0]} y1={positions[a][1]}
+            x2={positions[b][0]} y2={positions[b][1]}
+            className="la-edge"
+          />
+        ))}
+        {labels.slice(0,7).map((label, i) => (
+          <g key={i}>
+            <circle
+              cx={positions[i][0]} cy={positions[i][1]} r="20"
+              className={`la-vertex ${i === active ? "active" : ""}`}
+            />
+            <text x={positions[i][0]} y={positions[i][1] + 5}
+              textAnchor="middle" className="la-vertex-label">{label}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function GraphVisual({ labels, active }: { labels: string[]; active: number }) {
+  const points = [[65,85],[180,30],[330,85],[180,150]];
+  const edges = [[0,1],[1,2],[2,3],[3,0],[0,2]];
+  return (
+    <div className="la-graph">
+      <svg viewBox="0 0 400 180" role="img" aria-label="Graph traversal">
+        {edges.map(([a,b], i) => (
+          <line key={i}
+            x1={points[a][0]} y1={points[a][1]}
+            x2={points[b][0]} y2={points[b][1]}
+            className="la-edge"
+          />
+        ))}
+        {points.map(([x,y], i) => (
+          <g key={i}>
+            <circle cx={x} cy={y} r="22"
+              className={`la-vertex ${i === active % points.length ? "active" : ""}`} />
+            <text x={x} y={y+5} textAnchor="middle" className="la-vertex-label">
+              {labels[i] ?? "V"}
+            </text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function HashVisual({ labels, active }: { labels: string[]; active: number }) {
+  return (
+    <div className="la-hash">
+      {labels.map((label, i) => (
+        <div className={`la-hash-step ${i === active ? "active" : ""}`} key={i}>
+          <span>{i + 1}</span><strong>{label}</strong>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChartVisual({ labels, active }: { labels: string[]; active: number }) {
+  const heights = [42, 86, 62, 108, 72, 96, 55];
+  return (
+    <div className="la-chart">
+      {labels.map((label, i) => (
+        <div className="la-bar-wrap" key={i}>
+          <div className={`la-bar ${i === active ? "active" : ""}`}
+            style={{ height: heights[i % heights.length] }} />
+          <span>{label}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SpecialVisual({ visual, active }: { visual: Visual; active: number }) {
+  const labels = visual.labels;
+  if (visual.kind === "array" || visual.kind === "select" || visual.kind === "segment") {
+    return <ArrayVisual labels={labels} active={active % labels.length} />;
+  }
+  if (visual.kind === "linked") return <LinkedVisual labels={labels} active={active % labels.length} />;
+  if (visual.kind === "stack") return <StackVisual labels={labels} active={active % labels.length} />;
+  if (visual.kind === "queue") return <StackVisual labels={labels} active={active % labels.length} queue />;
+  if (visual.kind === "tree" || visual.kind === "trie" || visual.kind === "dsu") {
+    return <TreeVisual labels={labels} active={active % Math.min(labels.length, 7)} />;
+  }
+  if (visual.kind === "graph") return <GraphVisual labels={labels} active={active} />;
+  if (visual.kind === "hash" || visual.kind === "bloom" || visual.kind === "kmp") {
+    return <HashVisual labels={labels} active={active % labels.length} />;
+  }
+  if (visual.kind === "sort") return <ChartVisual labels={labels} active={active % labels.length} />;
+  if (visual.kind === "dp" || visual.kind === "recursion") {
+    return <FlowVisual labels={labels} active={active % labels.length} />;
+  }
+  if (visual.kind === "memory") return <ArrayVisual labels={labels} active={active % labels.length} />;
+  return <FlowVisual labels={labels} active={active % labels.length} />;
+}
+
+export default function LessonAnimation({
+  lessonId,
+  lessonTitle,
+  sceneIndex = 0,
+  playing = false,
+}: {
+  lessonId: string;
+  lessonTitle: string;
+  sceneIndex?: number;
+  playing?: boolean;
+}) {
+  const visual = visuals[lessonId] ?? make(
+    lessonTitle,
+    "Visual explanation",
+    "flow",
+    ["Input", "Process", "Output"],
+    ["Receive input", "Process information", "Produce result"],
+    "Follow how the concept transforms input into an output."
+  );
+
+  const active = Math.abs(sceneIndex) % visual.steps.length;
+
+  return (
+    <section
+      className={`lesson-animation ${playing ? "la-playing" : ""} la-kind-${visual.kind}`}
+      aria-label={`${lessonTitle} animated explanation`}
+    >
+      <div className="la-heading">
+        <span className="la-live-dot" />
+        <span>ANIMATED CONCEPT VISUALIZATION</span>
+        <span className="la-step-count">
+          {String(active + 1).padStart(2, "0")} / {String(visual.steps.length).padStart(2, "0")}
+        </span>
+      </div>
+
+      <h3>{visual.title}</h3>
+      <p className="la-subtitle">{visual.subtitle}</p>
+
+      <div className="la-stage" key={`${lessonId}-${sceneIndex}`}>
+        <SpecialVisual visual={visual} active={active} />
+      </div>
+
+      <div className="la-operation">
+        <span>ACTIVE OPERATION</span>
+        <strong>{visual.steps[active]}</strong>
+      </div>
+
+      <div className="la-explanation">
+        <span>WHAT YOU ARE SEEING</span>
+        <p>{visual.detail}</p>
+      </div>
+
+      <div className="la-timeline">
+        <span style={{ width: `${((active + 1) / visual.steps.length) * 100}%` }} />
+      </div>
+    </section>
+  );
+}
